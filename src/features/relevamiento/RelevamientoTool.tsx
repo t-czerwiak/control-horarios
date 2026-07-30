@@ -4,7 +4,7 @@ import { despivotarArchivo, ArchivoInvalidoError } from "./unpivot";
 import type { SheetResult } from "./unpivot";
 import {
   descargarPestana,
-  descargarZipPorPestana,
+  descargarExcelPorPestana,
   columnasDePestana,
   valorCelda,
 } from "./exportAirtable";
@@ -40,7 +40,6 @@ export default function RelevamientoTool() {
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
   const [arrastrando, setArrastrando] = useState(false);
-  const [generandoZip, setGenerandoZip] = useState(false);
   const [verTodas, setVerTodas] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -91,14 +90,8 @@ export default function RelevamientoTool() {
     setFileName("");
   };
 
-  const descargarZip = async () => {
-    if (!resultados) return;
-    setGenerandoZip(true);
-    try {
-      await descargarZipPorPestana(resultados);
-    } finally {
-      setGenerandoZip(false);
-    }
+  const descargarExcel = () => {
+    if (resultados) descargarExcelPorPestana(resultados);
   };
 
   // Pestaña actualmente seleccionada y sus columnas (solo las que tienen datos).
@@ -192,13 +185,8 @@ export default function RelevamientoTool() {
               {resultados.length !== 1 ? "s" : ""}
             </h2>
             <div className="acciones">
-              <button
-                type="button"
-                className="boton boton--secundario"
-                onClick={descargarZip}
-                disabled={generandoZip}
-              >
-                {generandoZip ? "Generando ZIP…" : "Descargar todas (ZIP)"}
+              <button type="button" className="boton boton--secundario" onClick={descargarExcel}>
+                Descargar todas (Excel)
               </button>
               <button type="button" className="boton boton--secundario" onClick={reiniciar}>
                 Procesar otro archivo

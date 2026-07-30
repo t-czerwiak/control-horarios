@@ -1,4 +1,4 @@
-import JSZip from "jszip";
+import * as XLSX from "xlsx";
 import { COLUMNAS_BASE } from "./unpivot";
 import type { RelevRow, SheetResult } from "./unpivot";
 
@@ -75,23 +75,38 @@ export function descargarPestana(res: SheetResult): void {
 }
 
 /**
- * Descarga un ZIP con un CSV por pestaña (cada uno con solo sus columnas con
- * datos), para tener todas las listas por separado en un solo archivo.
+ * Nombre de hoja de Excel válido: máx 31 caracteres, sin `\ / ? * [ ] :`, y único
+ * dentro del libro (Excel rechaza nombres repetidos o inválidos).
  */
-export async function descargarZipPorPestana(resultados: SheetResult[]): Promise<void> {
-  const zip = new JSZip();
-  const usados = new Map<string, number>();
+function nombreHoja(pestana: string, usados: Set<string>): string {
+  const base = (pestana.replace(/[\\/?*[\]:]/g, " ").trim().slice(0, 31) || "Hoja");
+  let nombre = base;
+  let i = 2;
+  while (usados.has(nombre.toLowerCase())) {
+    const sufijo = ` (${i})`;
+    nombre = base.slice(0, 31 - sufijo.length) + sufijo;
+    i++;
+  }
+  usados.add(nombre.toLowerCase());
+  return nombre;
+}
+
+/**
+ * Descarga UN Excel con una hoja por pestaña (cada hoja con solo sus columnas con
+ * datos). Es el "descargar todas": todas las listas juntas en un solo archivo, cada
+ * pestaña en su propia hoja.
+ */
+export function descargarExcelPorPestana(resultados: SheetResult[]): void {
+  const wb = XLSX.utils.book_new();
+  const usados = new Set<string>();
 
   for (const res of resultados) {
-    const csv = construirCSV(columnasDePestana(res), res.filas);
-    // Evita colisiones si dos pestañas generan el mismo nombre de archivo.
-    let nombre = nombreArchivo(res.pestana);
-    const n = usados.get(nombre) ?? 0;
-    usados.set(nombre, n + 1);
-    if (n > 0) nombre = nombre.replace(/\.csv$/, `-${n + 1}.csv`);
-    zip.file(nombre, csv);
+    const columnas = columnasDePestana(res);
+    const aoa = [columnas, ...res.filas.map((f) => columnas.map((c) => valorCelda(f, c)))];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = columnas.map((c) => ({ wch: Math.max(c.length + 2, 12) }));
+    XLSX.utils.book_append_sheet(wb, ws, nombreHoja(res.pestana, usados));
   }
 
-  const blob = await zip.generateAsync({ type: "blob" });
-  descargar(blob, "reportes-habitaciones-airtable-por-pestana.zip");
+  XLSX.writeFile(wb, "reportes-habitaciones.xlsx");
 }
