@@ -5,20 +5,20 @@ import { probarConexion, AirtableError, TABLA_EQUIPAMIENTO } from "./airtableCli
 import type { AirtableRecord } from "./airtableClient";
 
 // Gate suave (no es seguridad real: el código es visible). Solo evita que un
-// visitante casual entre a la sección de Airtable. La protección real es que el
-// token lo trae el usuario y nunca se guarda en el código.
+// visitante casual entre. La protección real es que el token lo trae el usuario
+// y nunca se guarda en el código.
 const PASSPHRASE = "servicio-htl";
 
 const LS_BASE = "sh_airtable_base";
 const LS_TOKEN = "sh_airtable_token";
 
 /**
- * Panel "Conectar con Airtable" — PRIMERA ETAPA: prueba de conexión y credenciales.
- * Permite pegar token + Base ID (quedan solo en el navegador), elegir hotel y probar
- * la conexión. Muestra un diagnóstico de lo que trae Airtable. La comparación completa
- * se agrega una vez confirmada la conexión.
+ * "Conectar con Airtable" — botón flotante en la esquina que abre una ventanita
+ * (modal) para ingresar la clave y las credenciales, y probar la conexión.
+ * ETAPA 1: valida token + Base ID + CORS. El token queda solo en el navegador.
  */
 export default function AirtablePanel() {
+  const [abierto, setAbierto] = useState(false);
   const [desbloqueado, setDesbloqueado] = useState(false);
   const [frase, setFrase] = useState("");
 
@@ -47,6 +47,14 @@ export default function AirtablePanel() {
     }
   }, []);
 
+  // Cerrar con Escape cuando el modal está abierto.
+  useEffect(() => {
+    if (!abierto) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setAbierto(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [abierto]);
+
   const pestanasMapeadas = Object.keys(MAPEO_PESTANA_ITEMS[hotel] ?? {}).length;
 
   const probar = async () => {
@@ -56,7 +64,6 @@ export default function AirtablePanel() {
       setError("Completá el Base ID y el token.");
       return;
     }
-    // Guardar / borrar según la preferencia (solo en este dispositivo).
     if (recordar) {
       localStorage.setItem(LS_BASE, baseId.trim());
       localStorage.setItem(LS_TOKEN, token.trim());
@@ -77,130 +84,199 @@ export default function AirtablePanel() {
     }
   };
 
-  if (!desbloqueado) {
-    return (
-      <section className="card">
-        <h2 className="airtable__titulo">Conectar con Airtable</h2>
-        <p className="deteccion">Esta sección es privada. Ingresá la clave de acceso para continuar.</p>
-        <div className="airtable__campo">
-          <label htmlFor="at-frase">Clave de acceso</label>
-          <input
-            id="at-frase"
-            type="password"
-            value={frase}
-            onChange={(e) => setFrase(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && frase === PASSPHRASE) setDesbloqueado(true);
-            }}
-            placeholder="clave"
-          />
-        </div>
-        {frase && frase !== PASSPHRASE && <p className="alerta" role="alert">Clave incorrecta.</p>}
-        <button
-          type="button"
-          className="boton boton--primario"
-          onClick={() => frase === PASSPHRASE && setDesbloqueado(true)}
-        >
-          Entrar
-        </button>
-      </section>
-    );
-  }
-
   return (
-    <section className="card">
-      <h2 className="airtable__titulo">
-        Conectar con Airtable <span className="badge-beta">prueba de conexión</span>
-      </h2>
-      <p className="deteccion">
-        Pegá tu token y Base ID de Airtable y probá la conexión. El token queda{" "}
-        <strong>solo en tu navegador</strong> (no se guarda en ningún servidor ni en el código).
-        Recomendado: usar un token con permisos mínimos (solo esa base, lectura de registros).
-      </p>
-
-      <div className="airtable__grid">
-        <div className="airtable__campo">
-          <label htmlFor="at-hotel">Hotel</label>
-          <select id="at-hotel" value={hotel} onChange={(e) => setHotel(e.target.value as Hotel)}>
-            {HOTELES.map((h) => (
-              <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-          </select>
-          <span className="airtable__hint">{pestanasMapeadas} pestañas mapeadas para comparar</span>
-        </div>
-
-        <div className="airtable__campo">
-          <label htmlFor="at-base">Base ID (empieza con app…)</label>
-          <input
-            id="at-base"
-            type="text"
-            value={baseId}
-            onChange={(e) => setBaseId(e.target.value)}
-            placeholder="appXXXXXXXXXXXXXX"
-            autoComplete="off"
+    <>
+      <button
+        type="button"
+        className="airtable-fab"
+        onClick={() => setAbierto(true)}
+        aria-haspopup="dialog"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path
+            d="M12 2 2 7l10 5 10-5-10-5Zm0 7.5L4.5 6 12 3l7.5 3L12 9.5ZM2 12l10 5 10-5M2 17l10 5 10-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
-        </div>
+        </svg>
+        Conectar con Airtable
+      </button>
 
-        <div className="airtable__campo airtable__campo--ancho">
-          <label htmlFor="at-token">Personal Access Token</label>
-          <input
-            id="at-token"
-            type="password"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="patXXXXXXXXXXXXXX…"
-            autoComplete="off"
-          />
-        </div>
+      {abierto && (
+        <div className="modal-overlay" onClick={() => setAbierto(false)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Conectar con Airtable"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal__cabecera">
+              <h2 className="modal__titulo">
+                Conectar con Airtable <span className="badge-beta">prueba de conexión</span>
+              </h2>
+              <button
+                type="button"
+                className="modal__cerrar"
+                onClick={() => setAbierto(false)}
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
 
-        <div className="airtable__campo airtable__campo--ancho">
-          <label htmlFor="at-tabla">Tabla</label>
-          <input id="at-tabla" type="text" value={tabla} onChange={(e) => setTabla(e.target.value)} />
-        </div>
-      </div>
+            <div className="modal__cuerpo">
+              {!desbloqueado ? (
+                <>
+                  <p className="deteccion">
+                    Esta sección es privada. Ingresá la clave de acceso para continuar.
+                  </p>
+                  <div className="airtable__campo">
+                    <label htmlFor="at-frase">Clave de acceso</label>
+                    <input
+                      id="at-frase"
+                      type="password"
+                      value={frase}
+                      autoFocus
+                      onChange={(e) => setFrase(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && frase === PASSPHRASE) setDesbloqueado(true);
+                      }}
+                      placeholder="clave"
+                    />
+                  </div>
+                  {frase && frase !== PASSPHRASE && (
+                    <p className="alerta" role="alert">
+                      Clave incorrecta.
+                    </p>
+                  )}
+                  <div className="acciones">
+                    <button
+                      type="button"
+                      className="boton boton--primario"
+                      onClick={() => frase === PASSPHRASE && setDesbloqueado(true)}
+                    >
+                      Entrar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="deteccion">
+                    Pegá tu token y Base ID de Airtable y probá la conexión. El token queda{" "}
+                    <strong>solo en tu navegador</strong> (no se guarda en ningún servidor ni en
+                    el código). Recomendado: un token con permisos mínimos (solo esa base, lectura
+                    de registros).
+                  </p>
 
-      <label className="airtable__recordar">
-        <input type="checkbox" checked={recordar} onChange={(e) => setRecordar(e.target.checked)} />
-        Recordar token y Base ID en este dispositivo (usa el almacenamiento local del navegador)
-      </label>
+                  <div className="airtable__grid">
+                    <div className="airtable__campo airtable__campo--ancho">
+                      <label htmlFor="at-hotel">Hotel</label>
+                      <select
+                        id="at-hotel"
+                        value={hotel}
+                        onChange={(e) => setHotel(e.target.value as Hotel)}
+                      >
+                        {HOTELES.map((h) => (
+                          <option key={h} value={h}>
+                            {h}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="airtable__hint">
+                        {pestanasMapeadas} pestañas mapeadas para comparar
+                      </span>
+                    </div>
 
-      <div className="acciones">
-        <button type="button" className="boton boton--primario" onClick={probar} disabled={probando}>
-          {probando ? "Conectando…" : "Probar conexión"}
-        </button>
-      </div>
+                    <div className="airtable__campo airtable__campo--ancho">
+                      <label htmlFor="at-base">Base ID (empieza con app…)</label>
+                      <input
+                        id="at-base"
+                        type="text"
+                        value={baseId}
+                        onChange={(e) => setBaseId(e.target.value)}
+                        placeholder="appXXXXXXXXXXXXXX"
+                        autoComplete="off"
+                      />
+                    </div>
 
-      {error && (
-        <p className="alerta" role="alert">
-          ⚠️ {error}
-        </p>
-      )}
+                    <div className="airtable__campo airtable__campo--ancho">
+                      <label htmlFor="at-token">Personal Access Token</label>
+                      <input
+                        id="at-token"
+                        type="password"
+                        value={token}
+                        onChange={(e) => setToken(e.target.value)}
+                        placeholder="patXXXXXXXXXXXXXX…"
+                        autoComplete="off"
+                      />
+                    </div>
 
-      {resultado && (
-        <div className="airtable__resultado">
-          <p className="aviso aviso--info">
-            ✅ Conexión OK. Traje {resultado.muestra.length} registro(s) de ejemplo
-            {resultado.hayMas ? " (hay más)" : ""}. Campos detectados:{" "}
-            <strong>{resultado.campos.join(", ") || "—"}</strong>.
-          </p>
-          <details>
-            <summary>Ver registros de ejemplo (crudo)</summary>
-            <pre className="airtable__json">
-              {JSON.stringify(
-                resultado.muestra.map((r) => r.fields),
-                null,
-                2
+                    <div className="airtable__campo airtable__campo--ancho">
+                      <label htmlFor="at-tabla">Tabla</label>
+                      <input
+                        id="at-tabla"
+                        type="text"
+                        value={tabla}
+                        onChange={(e) => setTabla(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <label className="airtable__recordar">
+                    <input
+                      type="checkbox"
+                      checked={recordar}
+                      onChange={(e) => setRecordar(e.target.checked)}
+                    />
+                    Recordar token y Base ID en este dispositivo
+                  </label>
+
+                  <div className="acciones">
+                    <button
+                      type="button"
+                      className="boton boton--primario"
+                      onClick={probar}
+                      disabled={probando}
+                    >
+                      {probando ? "Conectando…" : "Probar conexión"}
+                    </button>
+                  </div>
+
+                  {error && (
+                    <p className="alerta" role="alert">
+                      ⚠️ {error}
+                    </p>
+                  )}
+
+                  {resultado && (
+                    <div className="airtable__resultado">
+                      <p className="aviso aviso--info">
+                        ✅ Conexión OK. Traje {resultado.muestra.length} registro(s) de ejemplo
+                        {resultado.hayMas ? " (hay más)" : ""}. Campos:{" "}
+                        <strong>{resultado.campos.join(", ") || "—"}</strong>.
+                      </p>
+                      <details>
+                        <summary>Ver registros de ejemplo (crudo)</summary>
+                        <pre className="airtable__json">
+                          {JSON.stringify(
+                            resultado.muestra.map((r) => r.fields),
+                            null,
+                            2
+                          )}
+                        </pre>
+                      </details>
+                    </div>
+                  )}
+                </>
               )}
-            </pre>
-          </details>
-          <p className="deteccion">
-            Esto es la prueba de conexión. Con esto confirmado, el próximo paso es mostrar la
-            comparación (Estado, Observación y Fecha) contra el relevamiento.
-          </p>
+            </div>
+          </div>
         </div>
       )}
-    </section>
+    </>
   );
 }
