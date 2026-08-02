@@ -453,6 +453,39 @@ td.est {
   animation: modal-in 0.15s ease-out;
 }
 
+/* Modal más ancho cuando se muestra la tabla de diferencias. */
+.modal--ancho {
+  max-width: 760px;
+}
+
+.diff-wrap {
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.diff-tabla {
+  font-size: 0.82rem;
+}
+
+.diff-tabla th {
+  position: sticky;
+  top: 0;
+}
+
+.diff-viejo {
+  color: #b91c1c;
+  text-decoration: line-through;
+  white-space: nowrap;
+}
+
+.diff-nuevo {
+  color: #166534;
+  font-weight: 600;
+}
+
 @keyframes modal-in {
   from {
     opacity: 0;

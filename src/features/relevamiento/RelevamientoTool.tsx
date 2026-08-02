@@ -279,7 +279,7 @@ export default function RelevamientoTool() {
         </section>
       )}
 
-      {!cargando && <AirtablePanel />}
+      {!cargando && <AirtablePanel resultados={resultados} />}
     </>
   );
 }
