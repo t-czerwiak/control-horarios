@@ -8,6 +8,7 @@ import {
   columnasDePestana,
   valorCelda,
 } from "./exportAirtable";
+import AirtablePanel from "./airtable/AirtablePanel";
 
 const EXTENSIONES_VALIDAS = [".xlsx", ".xls"];
 const MAX_PREVIEW = 60;
@@ -277,6 +278,8 @@ export default function RelevamientoTool() {
           )}
         </section>
       )}
+
+      {!cargando && <AirtablePanel />}
     </>
   );
 }

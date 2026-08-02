@@ -402,6 +402,94 @@ td.est {
   font-size: 0.8rem;
 }
 
+/* Panel Conectar con Airtable */
+.airtable__titulo {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.badge-beta {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: #eff6ff;
+  color: var(--primario);
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  vertical-align: middle;
+}
+
+.airtable__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.airtable__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.airtable__campo--ancho {
+  grid-column: 1 / -1;
+}
+
+.airtable__campo label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+
+.airtable__campo input,
+.airtable__campo select {
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--texto);
+}
+
+.airtable__hint {
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+}
+
+.airtable__recordar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  margin-bottom: 1rem;
+}
+
+.airtable__resultado {
+  margin-top: 1rem;
+}
+
+.airtable__json {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 0.85rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-x: auto;
+  max-height: 340px;
+}
+
+@media (max-width: 520px) {
+  .airtable__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Tabla */
 .tabla-wrap {
   overflow-x: auto;
