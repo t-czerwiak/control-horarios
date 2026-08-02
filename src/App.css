@@ -493,7 +493,64 @@ td.est {
 }
 
 .modal__cuerpo {
-  padding: 1.25rem;
+  padding: 1.4rem;
+}
+
+/* Pantalla de clave (gate) */
+.gate {
+  text-align: center;
+  padding: 0.5rem 0.25rem 0.25rem;
+}
+
+.gate__icono {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primario-suave);
+  color: var(--primario);
+}
+
+.gate__texto {
+  color: var(--texto-suave);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin: 0 auto 1.15rem;
+  max-width: 22rem;
+}
+
+.gate .airtable__campo {
+  text-align: left;
+}
+
+.gate__error {
+  color: var(--alerta-texto);
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0.5rem 0 0.85rem;
+}
+
+.gate .airtable__campo input {
+  text-align: center;
+}
+
+/* Botón a ancho completo (dentro del modal) */
+.boton--full {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Foco prolijo en los inputs del modal */
+.airtable__campo input:focus,
+.airtable__campo select:focus {
+  outline: none;
+  border-color: var(--primario);
+  box-shadow: 0 0 0 3px var(--primario-suave);
 }
 
 /* Panel Conectar con Airtable */

@@ -21,6 +21,7 @@ export default function AirtablePanel() {
   const [abierto, setAbierto] = useState(false);
   const [desbloqueado, setDesbloqueado] = useState(false);
   const [frase, setFrase] = useState("");
+  const [claveMal, setClaveMal] = useState(false);
 
   const [hotel, setHotel] = useState<Hotel>(HOTELES[0]);
   const [baseId, setBaseId] = useState("");
@@ -54,6 +55,12 @@ export default function AirtablePanel() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [abierto]);
+
+  // La clave se valida SOLO al enviar (no mientras se tipea): no revela si es correcta.
+  const intentarEntrar = () => {
+    if (frase === PASSPHRASE) setDesbloqueado(true);
+    else setClaveMal(true);
+  };
 
   const pestanasMapeadas = Object.keys(MAPEO_PESTANA_ITEMS[hotel] ?? {}).length;
 
@@ -130,39 +137,55 @@ export default function AirtablePanel() {
 
             <div className="modal__cuerpo">
               {!desbloqueado ? (
-                <>
-                  <p className="deteccion">
+                <div className="gate">
+                  <div className="gate__icono" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="26" height="26">
+                      <path
+                        d="M6 10V8a6 6 0 1 1 12 0v2m-9 0h6a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3Z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <p className="gate__texto">
                     Esta sección es privada. Ingresá la clave de acceso para continuar.
                   </p>
                   <div className="airtable__campo">
-                    <label htmlFor="at-frase">Clave de acceso</label>
+                    <label htmlFor="at-frase" className="sr-only">
+                      Clave de acceso
+                    </label>
                     <input
                       id="at-frase"
                       type="password"
                       value={frase}
                       autoFocus
-                      onChange={(e) => setFrase(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && frase === PASSPHRASE) setDesbloqueado(true);
+                      onChange={(e) => {
+                        setFrase(e.target.value);
+                        setClaveMal(false);
                       }}
-                      placeholder="clave"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") intentarEntrar();
+                      }}
+                      placeholder="Clave de acceso"
+                      aria-invalid={claveMal}
                     />
                   </div>
-                  {frase && frase !== PASSPHRASE && (
-                    <p className="alerta" role="alert">
+                  {claveMal && (
+                    <p className="gate__error" role="alert">
                       Clave incorrecta.
                     </p>
                   )}
-                  <div className="acciones">
-                    <button
-                      type="button"
-                      className="boton boton--primario"
-                      onClick={() => frase === PASSPHRASE && setDesbloqueado(true)}
-                    >
-                      Entrar
-                    </button>
-                  </div>
-                </>
+                  <button
+                    type="button"
+                    className="boton boton--primario boton--full"
+                    onClick={intentarEntrar}
+                  >
+                    Entrar
+                  </button>
+                </div>
               ) : (
                 <>
                   <p className="deteccion">
