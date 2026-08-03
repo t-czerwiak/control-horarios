@@ -738,6 +738,52 @@ td.est {
   margin: 0.75rem 0;
 }
 
+/* Cargando a pantalla completa (bloquea la interacción para no interrumpir) */
+.carga-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.carga-overlay__box {
+  text-align: center;
+  color: #f8fafc;
+  max-width: 26rem;
+}
+
+.spinner--grande {
+  width: 52px;
+  height: 52px;
+  border-width: 4px;
+  border-color: rgba(148, 163, 184, 0.35);
+  border-top-color: #fff;
+  margin-bottom: 1.1rem;
+}
+
+.carga-overlay__titulo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.4rem;
+}
+
+.carga-overlay__msg {
+  font-size: 1rem;
+  color: #cbd5e1;
+  margin: 0 0 0.75rem;
+  min-height: 1.2em;
+}
+
+.carga-overlay__nota {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
 @media (max-width: 520px) {
   .airtable__grid {
     grid-template-columns: 1fr;

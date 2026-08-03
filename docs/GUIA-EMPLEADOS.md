@@ -1,9 +1,9 @@
-# Guía para el personal de HTL — Comparar y actualizar Airtable
+# Guía para el personal — Comparar y actualizar Airtable
 
 Esta guía explica, paso a paso, cómo pasar los datos de un **relevamiento de habitaciones**
-(el Excel) a la base de **Airtable** usando la herramienta web, sin tocar Airtable a mano.
+(el Excel) a la base de **Airtable**, usando la herramienta web, sin tocar Airtable a mano.
 
-**Página:** https://servicio-hoteleria.web.app → pestaña **"Convertidor de Reportes de Habitaciones → Airtable"**
+**Página:** la dirección de la herramienta → pestaña **"Convertidor de Reportes de Habitaciones → Airtable"**
 
 ---
 
@@ -22,10 +22,10 @@ Solo toca la tabla **Equipamiento por Espacio**, y de ella solo dos cosas:
 
 | Color en el Excel | Calificación |
 | --- | --- |
-| 🟢 Verde (Bien) | ★★★★★ (5) |
-| 🟡 Amarillo (Más o menos) | ★★★ (3) |
-| 🔴 Rojo (Mal) | ★ (1) |
-| ⬜ Sin color (No revisado) | *no se toca* |
+| Verde (Bien) | 5 estrellas |
+| Amarillo (Más o menos) | 3 estrellas |
+| Rojo (Mal) | 1 estrella |
+| Sin color (No revisado) | *no se toca* |
 
 > Si una habitación no tiene color, la herramienta **no cambia** su calificación en Airtable
 > (no borra lo que ya estaba).
@@ -36,21 +36,21 @@ Solo toca la tabla **Equipamiento por Espacio**, y de ella solo dos cosas:
 
 1. **El Excel** del relevamiento de la sede.
 2. **La clave de acceso** de la herramienta (pedísela al responsable).
-3. Del Airtable de Ticketera:
+3. De tu base de Airtable:
    - El **Base ID** (empieza con `app…`).
    - Un **token** (Personal Access Token, empieza con `pat…`).
 
 ### Cómo sacar el Base ID
-Abrí la base **Ticketera** en Airtable y mirá la dirección (URL) del navegador:
+Abrí tu base en Airtable y mirá la dirección (URL) del navegador:
 `https://airtable.com/` **`appXXXXXXXXXXXXXX`** `/tbl…/viw…` → copiá la parte que empieza con `app`.
 
 ### Cómo crear el token
 1. En Airtable, entrá a **airtable.com/create/tokens**.
-2. **Create new token** → ponele un nombre (ej. *HTL lectura y escritura*).
+2. **Create new token** → ponele un nombre (por ejemplo *Relevamientos*).
 3. **Scopes** (permisos): agregá
    - `data.records:read` (para comparar)
    - `data.records:write` (para poder **actualizar**)
-4. **Access**: dale acceso a la base **Ticketera**.
+4. **Access**: dale acceso a **tu base**.
 5. **Create token** → copiá el token (empieza con `pat…`). **Se muestra una sola vez.**
 
 > El token es como una llave: no lo compartas por chat/mail. La herramienta lo guarda
@@ -61,15 +61,15 @@ Abrí la base **Ticketera** en Airtable y mirá la dirección (URL) del navegado
 ## Paso a paso
 
 1. Entrá a la página y andá a la pestaña **"Convertidor de Reportes de Habitaciones → Airtable"**.
-2. Arriba, en **"Hotel del relevamiento"**, elegí la **sede** que corresponde al Excel
-   (Urbano / 9 de Julio / City). *Importante: elegí la sede correcta antes de subir el archivo.*
+2. Arriba, en **"Hotel del relevamiento"**, elegí la **sede** que corresponde al Excel.
+   *Importante: elegí la sede correcta antes de subir el archivo.*
 3. **Subí el Excel** (clic o arrastrándolo).
 4. Abajo a la derecha, tocá el botón **"Conectar con Airtable"**.
 5. Ingresá la **clave de acceso** y tocá **Entrar**.
 6. Pegá el **Base ID** y el **token**. (Podés tildar *"Recordar en este dispositivo"* para no
    pegarlos cada vez, si es tu computadora.)
-7. Tocá **"Comparar con el relevamiento"**. Va a tardar un rato (**30 a 60 segundos**) mientras
-   trae los datos; vas a ver una animación de carga.
+7. Tocá **"Comparar con el relevamiento"**. Va a tardar un rato (alrededor de **un minuto**)
+   mientras trae los datos; vas a ver una pantalla de carga. **Esperá a que termine.**
 8. Aparece la **vista previa**: una tabla con `Habitación · Ítem · Campo · En Airtable → Quedaría`.
    - En rojo tachado, lo que hay hoy en Airtable; en verde, cómo quedaría.
    - **Destildá** las filas que **no** quieras cambiar.
@@ -83,7 +83,7 @@ Abrí la base **Ticketera** en Airtable y mirá la dirección (URL) del navegado
 - La **primera vez que apliques**, probá con **1 o 2 filas** (destildá el resto) y verificá en
   Airtable que quedó bien. Después aplicá el resto.
 - Para **aplicar** hace falta que el token tenga el permiso `data.records:write` (ver arriba).
-- Si dice **"No hay diferencias"**, es que Airtable ya coincide con el Excel. 🎉
+- Si dice **"No hay diferencias"**, es que Airtable ya coincide con el Excel.
 
 ---
 
@@ -92,9 +92,9 @@ Abrí la base **Ticketera** en Airtable y mirá la dirección (URL) del navegado
 | Mensaje | Qué significa / qué hacer |
 | --- | --- |
 | *Token inválido o vencido* | Revisá el token, o creá uno nuevo. |
-| *El token no tiene permiso sobre esta base* | Al token le falta acceso a la base **Ticketera** (o el scope de escritura, si estás aplicando). |
+| *El token no tiene permiso sobre esta base* | Al token le falta acceso a tu base (o el permiso de escritura, si estás aplicando). |
 | *No se encontró la base o la tabla* | Revisá el **Base ID** (empieza con `app…`). |
 | *No se pudo conectar…* | Problema de internet. Reintentá. |
-| Tarda mucho | Es normal la primera vez (trae toda la base). Esperá a que termine la animación. |
+| Tarda mucho | Es normal la primera vez (trae toda la base). Esperá a que termine la pantalla de carga. |
 
 Ante cualquier duda o error que no figure acá, avisá al responsable con una captura de pantalla.

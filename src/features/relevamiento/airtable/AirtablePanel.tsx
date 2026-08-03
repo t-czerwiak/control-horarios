@@ -290,12 +290,6 @@ export default function AirtablePanel({ resultados, hotel }: Props) {
                   </div>
 
                   {!hayRelevamiento && <p className="airtable__hint">Para comparar, subí primero el Excel del relevamiento arriba.</p>}
-                  {comparando && (
-                    <p className="cargando-msg">
-                      <span className="spinner" aria-hidden="true" />
-                      {progreso || "Comparando…"}
-                    </p>
-                  )}
                   {error && (
                     <p className="alerta" role="alert">
                       ⚠️ {error}
@@ -378,6 +372,23 @@ export default function AirtablePanel({ resultados, hotel }: Props) {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {(comparando || aplicando) && (
+        <div className="carga-overlay" role="alert" aria-busy="true">
+          <div className="carga-overlay__box">
+            <span className="spinner spinner--grande" aria-hidden="true" />
+            <p className="carga-overlay__titulo">
+              {comparando ? "Comparando con Airtable…" : "Actualizando Airtable…"}
+            </p>
+            <p className="carga-overlay__msg">
+              {comparando ? progreso || "Trayendo datos…" : aplicaMsg || "Aplicando cambios…"}
+            </p>
+            <p className="carga-overlay__nota">
+              Esto puede tardar un minuto. No cierres ni toques la página hasta que termine.
+            </p>
           </div>
         </div>
       )}

@@ -126,6 +126,9 @@ y **actualizarla**, todo desde el navegador. Botón flotante **"Conectar con Air
 Módulos: `airtable/airtableClient.ts` (API), `airtable/comparar.ts` (cruce y diff),
 `airtable/AirtablePanel.tsx` (UI).
 
+Guía de uso paso a paso para el personal: [`docs/GUIA-EMPLEADOS.md`](docs/GUIA-EMPLEADOS.md)
+(genérica, sin marca; también disponible en PDF).
+
 ---
 
 ## 🚀 Desarrollo
