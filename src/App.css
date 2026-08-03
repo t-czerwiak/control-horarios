@@ -668,6 +668,76 @@ td.est {
   max-height: 340px;
 }
 
+.airtable__hotel {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+}
+
+/* Selector de hotel del conversor */
+.hotel-selector {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0 auto 1.5rem;
+  max-width: 40rem;
+  padding: 0.85rem 1rem;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: var(--radio);
+}
+
+.hotel-selector label {
+  font-weight: 600;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.hotel-selector select {
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--texto);
+  cursor: pointer;
+}
+
+.hotel-selector__hint {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* Spinner de carga */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--borde);
+  border-top-color: var(--primario);
+  display: inline-block;
+  animation: girar 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cargando-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+  margin: 0.75rem 0;
+}
+
 @media (max-width: 520px) {
   .airtable__grid {
     grid-template-columns: 1fr;

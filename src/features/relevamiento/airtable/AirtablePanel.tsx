@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { HOTELES, MAPEO_PESTANA_ITEMS } from "./mapeoAirtable";
+import { MAPEO_PESTANA_ITEMS } from "./mapeoAirtable";
 import type { Hotel } from "./mapeoAirtable";
 import {
   probarConexion,
@@ -19,6 +19,8 @@ const LS_TOKEN = "sh_airtable_token";
 interface Props {
   /** Relevamiento ya procesado (para comparar). Null si todavía no subieron el Excel. */
   resultados: SheetResult[] | null;
+  /** Hotel elegido en el conversor (define grilla y mapeo). */
+  hotel: Hotel;
 }
 
 /**
@@ -26,13 +28,12 @@ interface Props {
  * clave y las credenciales, probar la conexión, COMPARAR el relevamiento con Airtable
  * (con vista previa de cómo quedaría) y APLICAR los cambios elegidos.
  */
-export default function AirtablePanel({ resultados }: Props) {
+export default function AirtablePanel({ resultados, hotel }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [desbloqueado, setDesbloqueado] = useState(false);
   const [frase, setFrase] = useState("");
   const [claveMal, setClaveMal] = useState(false);
 
-  const [hotel, setHotel] = useState<Hotel>(HOTELES[0]);
   const [baseId, setBaseId] = useState("");
   const [token, setToken] = useState("");
   const [tabla, setTabla] = useState(TABLA_EQUIPAMIENTO);
@@ -254,18 +255,12 @@ export default function AirtablePanel({ resultados }: Props) {
                     subí primero el Excel del relevamiento (arriba) y elegí el hotel que corresponde.
                   </p>
 
+                  <p className="airtable__hotel">
+                    Hotel: <strong>{hotel}</strong> · {pestanasMapeadas} pestañas mapeadas
+                    <span className="airtable__hint"> (se elige arriba, en el conversor)</span>
+                  </p>
+
                   <div className="airtable__grid">
-                    <div className="airtable__campo airtable__campo--ancho">
-                      <label htmlFor="at-hotel">Hotel</label>
-                      <select id="at-hotel" value={hotel} onChange={(e) => setHotel(e.target.value as Hotel)}>
-                        {HOTELES.map((h) => (
-                          <option key={h} value={h}>
-                            {h}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="airtable__hint">{pestanasMapeadas} pestañas mapeadas para comparar</span>
-                    </div>
                     <div className="airtable__campo airtable__campo--ancho">
                       <label htmlFor="at-base">Base ID (empieza con app…)</label>
                       <input id="at-base" type="text" value={baseId} onChange={(e) => setBaseId(e.target.value)} placeholder="appXXXXXXXXXXXXXX" autoComplete="off" />
@@ -295,7 +290,12 @@ export default function AirtablePanel({ resultados }: Props) {
                   </div>
 
                   {!hayRelevamiento && <p className="airtable__hint">Para comparar, subí primero el Excel del relevamiento arriba.</p>}
-                  {comparando && progreso && <p className="info-card">{progreso}</p>}
+                  {comparando && (
+                    <p className="cargando-msg">
+                      <span className="spinner" aria-hidden="true" />
+                      {progreso || "Comparando…"}
+                    </p>
+                  )}
                   {error && (
                     <p className="alerta" role="alert">
                       ⚠️ {error}

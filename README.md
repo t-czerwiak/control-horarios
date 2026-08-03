@@ -91,13 +91,40 @@ error en la planilla— así que se excluye; el piso 10 queda con `1001`, `1003`
      `Más o menos = 3`, `Mal = 1`, `No revisado` queda en blanco.
    - Las fechas se formatean `dd/mm/aaaa`. Los demás datos van **en crudo**, sin clasificar.
    - Se incluyen todas las habitaciones del bloque (para ver qué falta revisar).
-3. **Se ve y se descarga una pestaña a la vez**: elegís la pestaña en un selector, ves su
-   vista previa y descargás su CSV individual. Opcionalmente, **Descargar todas (ZIP)** trae
-   un CSV por pestaña, por separado, en un solo archivo
-   (`relevamiento-airtable-por-pestana.zip`).
+3. Antes de subir el Excel se **elige el hotel** (Urbano / 9 de Julio / City). Cada sede tiene
+   su propia grilla de habitaciones (Urbano 82, 9 de Julio 57, City 70), tomada de la tabla
+   `Espacios` de Airtable; el archivo se normaliza a la grilla de esa sede.
+4. **Se ve y se descarga una pestaña a la vez**: elegís la pestaña en un selector, ves su
+   vista previa y descargás su CSV individual. **Descargar todas** genera un único Excel
+   (`reportes-habitaciones.xlsx`) con una hoja por pestaña.
 
-Los CSV son **UTF-8** (con BOM, para que Excel muestre bien las tildes/ñ) y se importan
-como una tabla por pestaña en Airtable.
+Los CSV son **UTF-8** (con BOM, para que Excel muestre bien las tildes/ñ).
+
+---
+
+## ☁️ Comparación / actualización contra Airtable
+
+La herramienta puede **comparar** el relevamiento con la base Airtable del cliente (Ticketera)
+y **actualizarla**, todo desde el navegador. Botón flotante **"Conectar con Airtable"**.
+
+- **Seguridad**: el token (Personal Access Token) y el Base ID quedan **solo en el navegador**
+  (en memoria, u opcionalmente en `localStorage` si se marca "recordar"); nunca en el código
+  ni en el repo. La sección está detrás de una passphrase (candado suave, en el cliente). La
+  API de Airtable acepta llamadas desde el navegador (CORS), así que **no hace falta backend**.
+- **Cruce**: por sede (del campo `Espacio`), y por `Ítem × Habitación`. El mapeo pestaña→ítem
+  por hotel está en `src/features/relevamiento/airtable/mapeoAirtable.ts` (generado desde la
+  planilla del cliente; regenerar con el script si cambia). Se resuelven los campos linkeados
+  (`Espacio`, `Ítem`) trayendo las tablas `Espacios` e `Items`.
+- **Campos comparados/actualizados** (solo tabla `Equipamiento por Espacio`):
+  - **Calificación** (`Calificación actual`, estrellas 1–5): del color del relevamiento —
+    `Bien = 5`, `Más o menos = 3`, `Mal = 1`. `No revisado` **no** toca la calificación.
+  - **Observación**: del `Detalle` del relevamiento (no se pisa con vacío).
+- **Flujo**: *Comparar* (solo lectura) → **vista previa** de cada cambio (`En Airtable → Quedaría`),
+  con checkbox por fila → *Aplicar* (PATCH en lotes de 10, con confirmación). Actualizar requiere
+  que el token tenga el scope `data.records:write`.
+
+Módulos: `airtable/airtableClient.ts` (API), `airtable/comparar.ts` (cruce y diff),
+`airtable/AirtablePanel.tsx` (UI).
 
 ---
 

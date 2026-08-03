@@ -50,50 +50,69 @@ const ESTADO_NUM: Record<Estado, string> = {
 };
 
 /**
- * Habitaciones que NO existen aunque aparezcan en la planilla (errores de carga).
- * Se descartan de todas las listas. Ej.: la 1002 no existe en el hotel.
+ * Grilla real de un hotel: cuántas habitaciones tiene cada piso, y las que NO existen
+ * (a descartar aunque aparezcan por error en el Excel). Cada hotel tiene su grilla.
  */
-const HABITACIONES_EXCLUIDAS = new Set<number>([1002]);
+export interface Grilla {
+  pisos: Record<number, number>;
+  excluidas: Set<number>;
+}
 
 /**
- * Grilla CANÓNICA del hotel: cuántas habitaciones tiene cada piso.
- * Se dedujo del propio archivo (los índices que aparecen en todas las pestañas):
- * pisos 1–8 tienen X01–X09, el piso 9 tiene 901–907 y el piso 10 tiene 1001–1004.
- * Total = 8·9 + 7 + 4 = 83 habitaciones. Todas las listas se normalizan a esta grilla,
- * lo que corrige typos, rellena faltantes, descarta números sueltos y evita duplicados.
+ * Grillas por hotel (deducidas de la tabla Espacios de Airtable):
+ *  - Urbano: pisos 1–8 con X01–X09, piso 9 con 901–907, piso 10 con 1001/1003/1004 (la 1002 no existe).
+ *  - 9 de Julio: pisos 2–6 con X01–X10, piso 7 con 701–707.
+ *  - City Baires: pisos 2–12 con X01–X06, piso 13 con 1301–1304.
+ * Todas las listas se normalizan a la grilla del hotel: corrige typos, rellena
+ * faltantes, descarta números sueltos y evita duplicados.
  */
-const PISOS: Record<number, number> = { 1: 9, 2: 9, 3: 9, 4: 9, 5: 9, 6: 9, 7: 9, 8: 9, 9: 7, 10: 4 };
+export const GRILLAS: Record<string, Grilla> = {
+  "HTL Urbano": {
+    pisos: { 1: 9, 2: 9, 3: 9, 4: 9, 5: 9, 6: 9, 7: 9, 8: 9, 9: 7, 10: 4 },
+    excluidas: new Set([1002]),
+  },
+  "HTL 9 de Julio": {
+    pisos: { 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 7 },
+    excluidas: new Set(),
+  },
+  "HTL City Baires": {
+    pisos: { 2: 6, 3: 6, 4: 6, 5: 6, 6: 6, 7: 6, 8: 6, 9: 6, 10: 6, 11: 6, 12: 6, 13: 4 },
+    excluidas: new Set(),
+  },
+};
 
-/** Número de habitación a partir de piso + índice (piso 10 → 1001…). */
+const GRILLA_DEFAULT = GRILLAS["HTL Urbano"];
+
+/** Número de habitación a partir de piso + índice (piso·100 + índice). */
 function numeroHab(piso: number, idx: number): number {
-  return piso === 10 ? 1000 + idx : piso * 100 + idx;
+  return piso * 100 + idx;
 }
 
-/** Piso de un número de habitación (1001 → 10, 305 → 3). */
+/** Piso de un número de habitación (1001 → 10, 1306 → 13, 305 → 3). */
 function pisoDeNum(n: number): number {
-  return n >= 1000 ? 10 : Math.floor(n / 100);
+  return Math.floor(n / 100);
 }
 
-/** Índice dentro del piso (1001 → 1, 305 → 5). */
+/** Índice dentro del piso (1001 → 1, 1306 → 6, 305 → 5). */
 function idxDeNum(n: number): number {
-  return n >= 1000 ? n - 1000 : n % 100;
+  return n % 100;
 }
 
-/** ¿El número corresponde a una habitación real de la grilla canónica? */
-function esCanonica(n: number): boolean {
-  if (HABITACIONES_EXCLUIDAS.has(n)) return false;
+/** ¿El número corresponde a una habitación real de la grilla dada? */
+function esCanonica(n: number, grid: Grilla): boolean {
+  if (grid.excluidas.has(n)) return false;
   const piso = pisoDeNum(n);
   const idx = idxDeNum(n);
-  return piso in PISOS && idx >= 1 && idx <= PISOS[piso];
+  return piso in grid.pisos && idx >= 1 && idx <= grid.pisos[piso];
 }
 
-/** Lista de todas las habitaciones canónicas, en orden numérico (101…1004). */
-function habitacionesCanonicas(): number[] {
+/** Lista de todas las habitaciones canónicas del hotel, en orden numérico. */
+function habitacionesCanonicas(grid: Grilla): number[] {
   const rooms: number[] = [];
-  for (const piso of Object.keys(PISOS).map(Number)) {
-    for (let idx = 1; idx <= PISOS[piso]; idx++) {
+  for (const piso of Object.keys(grid.pisos).map(Number)) {
+    for (let idx = 1; idx <= grid.pisos[piso]; idx++) {
       const n = numeroHab(piso, idx);
-      if (!HABITACIONES_EXCLUIDAS.has(n)) rooms.push(n);
+      if (!grid.excluidas.has(n)) rooms.push(n);
     }
   }
   return rooms.sort((a, b) => a - b);
@@ -257,7 +276,7 @@ interface Cabecera {
  * suelto, pero rechaza las filas "desordenadas" (como las de Cambio Cerradura, donde
  * los números no van en orden ni alineados a su columna): esas son datos, no cabeceras.
  */
-function detectarCabecera(fila: number, row: unknown[]): Cabecera | null {
+function detectarCabecera(fila: number, row: unknown[], grid: Grilla): Cabecera | null {
   const celdas: { col: number; n: number }[] = [];
   for (let c = 0; c < row.length; c++) {
     if (esHabitacion(row[c])) celdas.push({ col: c, n: numDeCelda(row[c]) });
@@ -265,7 +284,7 @@ function detectarCabecera(fila: number, row: unknown[]): Cabecera | null {
   if (celdas.length < 3) return null;
 
   const piso = moda(celdas.map((x) => pisoDeNum(x.n)));
-  if (!(piso in PISOS)) return null;
+  if (!(piso in grid.pisos)) return null;
 
   // Solo las celdas del piso mayoritario definen la grilla; el resto son sueltos.
   const delPiso = celdas.filter((x) => pisoDeNum(x.n) === piso);
@@ -322,9 +341,9 @@ function completarEstado(filas: RelevRow[]): void {
 }
 
 /** Ensambla el resultado final: rellena habitaciones faltantes y ordena por número. */
-function armarResultado(pestana: string, mapa: Map<number, RelevRow>): SheetResult {
+function armarResultado(pestana: string, mapa: Map<number, RelevRow>, grid: Grilla): SheetResult {
   const filas: RelevRow[] = [];
-  for (const room of habitacionesCanonicas()) {
+  for (const room of habitacionesCanonicas(grid)) {
     const existente = mapa.get(room);
     if (existente) {
       filas.push(existente);
@@ -353,7 +372,8 @@ function despivotarGrilla(
   pestana: string,
   valores: unknown[][],
   estados: Estado[][],
-  cabeceras: Cabecera[]
+  cabeceras: Cabecera[],
+  grid: Grilla
 ): SheetResult {
   const mapa = new Map<number, RelevRow>();
   const campoDefault = campoPorDefecto(pestana);
@@ -375,7 +395,7 @@ function despivotarGrilla(
   for (let b = 0; b < cabeceras.length; b++) {
     const { fila: hr, piso, offset } = cabeceras[b];
     const finBloque = b + 1 < cabeceras.length ? cabeceras[b + 1].fila : valores.length;
-    const nIdx = PISOS[piso];
+    const nIdx = grid.pisos[piso];
 
     // Columna de la primera habitación del piso; si es >0, la col 0 es la etiqueta.
     const minCol = offset + 1;
@@ -386,7 +406,7 @@ function despivotarGrilla(
       const col = offset + idx;
       if (col < 0) continue;
       const room = numeroHab(piso, idx);
-      if (HABITACIONES_EXCLUIDAS.has(room)) continue; // habitación inexistente
+      if (grid.excluidas.has(room)) continue; // habitación inexistente
       const fila = obtener(room);
       const est = estados[hr]?.[col] ?? "No revisado";
       if (est !== "No revisado") fila.campos["Estado"] = est;
@@ -402,7 +422,7 @@ function despivotarGrilla(
         const col = offset + idx;
         if (col < 0) continue;
         const room = numeroHab(piso, idx);
-        if (HABITACIONES_EXCLUIDAS.has(room)) continue; // habitación inexistente
+        if (grid.excluidas.has(room)) continue; // habitación inexistente
         const valor = celdaTexto(row[col]);
         if (!valor) continue;
         // Un valor que es solo un número de habitación es basura (ej. filas
@@ -413,24 +433,25 @@ function despivotarGrilla(
     }
   }
 
-  return armarResultado(pestana, mapa);
+  return armarResultado(pestana, mapa, grid);
 }
 
 /**
  * Despivota una hoja VERTICAL (tipo "Generales"): la habitación está en la
- * columna A y el detalle en la B. Se normaliza igual a la grilla canónica.
+ * columna A y el detalle en la B. Se normaliza igual a la grilla del hotel.
  */
 function despivotarVertical(
   pestana: string,
   valores: unknown[][],
-  estados: Estado[][]
+  estados: Estado[][],
+  grid: Grilla
 ): SheetResult {
   const mapa = new Map<number, RelevRow>();
   for (let r = 0; r < valores.length; r++) {
     const row = valores[r];
     if (!esHabitacion(row[0])) continue;
     const n = numDeCelda(row[0]);
-    if (!esCanonica(n)) continue; // descarta números sueltos / fuera de grilla
+    if (!esCanonica(n, grid)) continue; // descarta números sueltos / fuera de grilla
     let fila = mapa.get(n);
     if (!fila) {
       fila = { pestana, piso: String(pisoDeNum(n)), habitacion: String(n), campos: { Estado: "No revisado" } };
@@ -441,24 +462,24 @@ function despivotarVertical(
     const detalle = celdaTexto(row[1]);
     if (detalle && !esHabitacion(detalle)) agregarCampo(fila.campos, "Detalle", detalle);
   }
-  return armarResultado(pestana, mapa);
+  return armarResultado(pestana, mapa, grid);
 }
 
 /** Despivota una sola hoja, eligiendo el modo (grilla o vertical) automáticamente. */
-export function despivotarHoja(pestana: string, ws: XLSX.WorkSheet): SheetResult {
+export function despivotarHoja(pestana: string, ws: XLSX.WorkSheet, grid: Grilla = GRILLA_DEFAULT): SheetResult {
   const { valores, estados } = leerHoja(ws);
 
   // Cabeceras = filas con los números de habitación de un piso (en orden y alineados).
   const cabeceras: Cabecera[] = [];
   for (let i = 0; i < valores.length; i++) {
-    const cab = detectarCabecera(i, valores[i]);
+    const cab = detectarCabecera(i, valores[i], grid);
     if (cab) cabeceras.push(cab);
   }
-  if (cabeceras.length > 0) return despivotarGrilla(pestana, valores, estados, cabeceras);
+  if (cabeceras.length > 0) return despivotarGrilla(pestana, valores, estados, cabeceras, grid);
 
   // Sin bloques horizontales: ¿hay habitaciones en la columna A (vertical)?
   const habsColA = valores.filter((r) => esHabitacion(r[0])).length;
-  if (habsColA >= 3) return despivotarVertical(pestana, valores, estados);
+  if (habsColA >= 3) return despivotarVertical(pestana, valores, estados, grid);
 
   // No se reconoció el formato: hoja sin habitaciones.
   return { pestana, columnas: [], filas: [] };
@@ -469,7 +490,7 @@ export function despivotarHoja(pestana: string, ws: XLSX.WorkSheet): SheetResult
  * pestaña. Lanza ArchivoInvalidoError si el archivo es ilegible o no tiene
  * ninguna habitación reconocible en ninguna pestaña.
  */
-export async function despivotarArchivo(file: File): Promise<SheetResult[]> {
+export async function despivotarArchivo(file: File, hotel = "HTL Urbano"): Promise<SheetResult[]> {
   const buffer = await file.arrayBuffer();
   let workbook: XLSX.WorkBook;
   try {
@@ -481,9 +502,10 @@ export async function despivotarArchivo(file: File): Promise<SheetResult[]> {
     );
   }
 
+  const grid = GRILLAS[hotel] ?? GRILLA_DEFAULT;
   const resultados: SheetResult[] = [];
   for (const nombre of workbook.SheetNames) {
-    const res = despivotarHoja(nombre.trim(), workbook.Sheets[nombre]);
+    const res = despivotarHoja(nombre.trim(), workbook.Sheets[nombre], grid);
     if (res.filas.length > 0) resultados.push(res);
   }
 

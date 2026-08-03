@@ -7,23 +7,28 @@ import type { SheetResult } from "../unpivot";
 export const T_ESPACIOS = "Espacios";
 export const T_ITEMS = "Items";
 
-// Estado del relevamiento -> opción de "Estado" en Airtable. "No revisado" NO se
-// mapea a propósito: si el relevamiento no tiene color, no se toca el estado de
-// Airtable (no se pisa una calificación existente con "Sin calificar").
-const ESTADO_A_AIRTABLE: Record<string, string> = {
-  Bien: "Excelente",
-  "Más o menos": "Regular",
-  Mal: "Malo",
+// Campos de "Equipamiento por Espacio" que se comparan y se actualizan.
+// Calificación = estrellas 1–5 (número). Observación = texto.
+const CAMPO_CALIFICACION = "Calificación actual";
+const CAMPO_OBSERVACION = "Observación";
+
+// Estado del relevamiento (color) -> calificación 1–5. "No revisado" queda sin
+// calificar: NO se toca la calificación de Airtable si el relevamiento no tiene color.
+const ESTADO_A_ESTRELLAS: Record<string, number> = {
+  Bien: 5,
+  "Más o menos": 3,
+  Mal: 1,
 };
 
-export type CampoAirtable = "Estado" | "Observación" | "Fecha último rankeo";
+export type CampoDiff = "Calificación" | "Observación";
 
 /** Una diferencia entre el relevamiento y Airtable, en un campo puntual. */
 export interface Diff {
   habitacion: string;
   item: string;
   recordId: string;
-  campo: CampoAirtable;
+  campo: CampoDiff; // para mostrar
+  campoAirtable: string; // nombre real del campo a escribir
   enAirtable: string; // valor actual (para mostrar)
   quedaria: string; // valor nuevo (para mostrar)
   valorNuevo: unknown; // valor a enviar a Airtable
@@ -40,25 +45,17 @@ const primerLink = (v: unknown): string | undefined =>
   Array.isArray(v) && v.length ? String(v[0]) : undefined;
 const clave = (item: string, room: string): string => `${item.toLowerCase()}|${room}`;
 
-/** dd/mm/aaaa -> yyyy-mm-dd (formato que espera Airtable en fechas). */
-function ddmmAISO(s: string): string {
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : s;
+/** Sede a partir del Identificador del espacio ("Habitación 201 - HTL Urbano" → "HTL Urbano"). */
+function hotelDeIdentificador(id: string): string {
+  const partes = id.split(" - ");
+  return partes.length > 1 ? partes[partes.length - 1].trim() : "";
 }
-/** Valor de fecha de Airtable (ISO con o sin hora, o dd/mm/aaaa) -> yyyy-mm-dd. */
-function airISO(v: unknown): string {
-  const s = texto(v);
-  if (!s) return "";
-  if (s.includes("T")) return s.slice(0, 10);
-  return ddmmAISO(s);
-}
-/** El campo "Hotel" puede venir como texto o como registro linkeado (array). */
-const normHotel = (v: unknown): string => (Array.isArray(v) ? texto(v[0]) : texto(v));
 
 /**
  * Compara el relevamiento procesado contra Airtable, para el hotel elegido.
- * Trae Espacios e Items para resolver los IDs de los campos linkeados, trae todo
- * el Equipamiento, y arma la lista de diferencias en Estado, Observación y Fecha.
+ * Trae Espacios (para saber la habitación y la sede de cada registro) e Items
+ * (para resolver el nombre del ítem), trae el Equipamiento del hotel, y arma la
+ * lista de diferencias en Calificación (1–5) y Observación.
  */
 export async function compararConAirtable(
   cfg: { token: string; baseId: string; tablaEquip: string; hotel: Hotel },
@@ -69,12 +66,14 @@ export async function compararConAirtable(
 
   onProgreso?.("Trayendo espacios…");
   const espacios = await listarTodos(token, baseId, T_ESPACIOS, {
-    campos: ["Número de Habitación", "Hotel"],
+    campos: ["Identificador", "Número de Habitación"],
   });
-  const espacioById = new Map<string, { room: string; hotel: string }>();
+  // Solo los espacios de este hotel: id de registro -> número de habitación.
+  const habDeEspacio = new Map<string, string>();
   for (const e of espacios) {
     const room = texto(e.fields["Número de Habitación"]);
-    if (room) espacioById.set(e.id, { room, hotel: normHotel(e.fields["Hotel"]) });
+    const sede = hotelDeIdentificador(texto(e.fields["Identificador"]));
+    if (room && sede === hotel) habDeEspacio.set(e.id, room);
   }
 
   onProgreso?.("Trayendo ítems…");
@@ -82,22 +81,21 @@ export async function compararConAirtable(
   const itemById = new Map<string, string>();
   for (const it of items) itemById.set(it.id, texto(it.fields["Name"]));
 
-  // Índice de Airtable: (ítem, habitación) -> valores actuales, filtrado al hotel.
-  const airByKey = new Map<string, { recordId: string; estado: string; obs: string; fecha: string }>();
+  // Índice de Airtable: (ítem, habitación) -> valores actuales, ya filtrado al hotel.
+  const airByKey = new Map<string, { recordId: string; calif: string; obs: string }>();
   const equip = await listarTodos(token, baseId, tablaEquip, {
-    campos: ["Espacio", "Ítem", "Estado", "Observación", "Fecha último rankeo"],
+    campos: ["Espacio", "Ítem", CAMPO_CALIFICACION, CAMPO_OBSERVACION],
     onProgreso: (n) => onProgreso?.(`Trayendo equipamiento… ${n} registros`),
   });
   for (const r of equip) {
-    const esp = espacioById.get(primerLink(r.fields["Espacio"]) ?? "");
-    if (!esp || esp.hotel !== hotel) continue;
+    const room = habDeEspacio.get(primerLink(r.fields["Espacio"]) ?? "");
+    if (!room) continue; // el espacio no es de este hotel
     const itemName = itemById.get(primerLink(r.fields["Ítem"]) ?? "");
     if (!itemName) continue;
-    airByKey.set(clave(itemName, esp.room), {
+    airByKey.set(clave(itemName, room), {
       recordId: r.id,
-      estado: texto(r.fields["Estado"]),
-      obs: texto(r.fields["Observación"]),
-      fecha: texto(r.fields["Fecha último rankeo"]),
+      calif: texto(r.fields[CAMPO_CALIFICACION]),
+      obs: texto(r.fields[CAMPO_OBSERVACION]),
     });
   }
 
@@ -111,9 +109,8 @@ export async function compararConAirtable(
     const res = porPestana.get(pestana);
     if (!res) continue;
     for (const fila of res.filas) {
-      const relEstado = ESTADO_A_AIRTABLE[texto(fila.campos["Estado"])]; // undefined si "No revisado"
+      const estrellas = ESTADO_A_ESTRELLAS[texto(fila.campos["Estado"])]; // undefined si "No revisado"
       const relObs = texto(fila.campos["Detalle"]);
-      const relFecha = texto(fila.campos["Auditada"]);
       for (const item of itemsMap) {
         const air = airByKey.get(clave(item, fila.habitacion));
         if (!air) {
@@ -122,14 +119,27 @@ export async function compararConAirtable(
         }
         comparados++;
         const base = { habitacion: fila.habitacion, item, recordId: air.recordId };
-        if (relEstado && relEstado !== air.estado) {
-          diffs.push({ ...base, campo: "Estado", enAirtable: air.estado || "(vacío)", quedaria: relEstado, valorNuevo: relEstado });
+        // Calificación: solo si el relevamiento tiene color y difiere de Airtable.
+        if (estrellas !== undefined && String(estrellas) !== air.calif) {
+          diffs.push({
+            ...base,
+            campo: "Calificación",
+            campoAirtable: CAMPO_CALIFICACION,
+            enAirtable: air.calif || "(sin calificar)",
+            quedaria: `${estrellas} ★`,
+            valorNuevo: estrellas,
+          });
         }
+        // Observación: solo si el relevamiento trae algo distinto (no pisar con vacío).
         if (relObs && relObs !== air.obs) {
-          diffs.push({ ...base, campo: "Observación", enAirtable: air.obs || "(vacío)", quedaria: relObs, valorNuevo: relObs });
-        }
-        if (relFecha && ddmmAISO(relFecha) !== airISO(air.fecha)) {
-          diffs.push({ ...base, campo: "Fecha último rankeo", enAirtable: air.fecha || "(vacío)", quedaria: relFecha, valorNuevo: ddmmAISO(relFecha) });
+          diffs.push({
+            ...base,
+            campo: "Observación",
+            campoAirtable: CAMPO_OBSERVACION,
+            enAirtable: air.obs || "(vacío)",
+            quedaria: relObs,
+            valorNuevo: relObs,
+          });
         }
       }
     }
@@ -142,7 +152,7 @@ export function armarUpdates(diffs: Diff[]): { id: string; fields: Record<string
   const porRecord = new Map<string, Record<string, unknown>>();
   for (const d of diffs) {
     const f = porRecord.get(d.recordId) ?? {};
-    f[d.campo] = d.valorNuevo;
+    f[d.campoAirtable] = d.valorNuevo;
     porRecord.set(d.recordId, f);
   }
   return [...porRecord.entries()].map(([id, fields]) => ({ id, fields }));

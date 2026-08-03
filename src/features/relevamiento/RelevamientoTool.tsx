@@ -9,6 +9,8 @@ import {
   valorCelda,
 } from "./exportAirtable";
 import AirtablePanel from "./airtable/AirtablePanel";
+import { HOTELES } from "./airtable/mapeoAirtable";
+import type { Hotel } from "./airtable/mapeoAirtable";
 
 const EXTENSIONES_VALIDAS = [".xlsx", ".xls"];
 const MAX_PREVIEW = 60;
@@ -42,9 +44,13 @@ export default function RelevamientoTool() {
   const [cargando, setCargando] = useState(false);
   const [arrastrando, setArrastrando] = useState(false);
   const [verTodas, setVerTodas] = useState(false);
+  const [hotel, setHotel] = useState<Hotel>("HTL Urbano");
   const inputRef = useRef<HTMLInputElement>(null);
+  const ultimoArchivo = useRef<File | null>(null);
 
-  const procesarArchivo = useCallback(async (file: File) => {
+  // Se pasa el hotel para normalizar a la grilla de habitaciones de esa sede.
+  const procesarArchivo = useCallback(async (file: File, hotelSel: Hotel) => {
+    ultimoArchivo.current = file;
     setError("");
     setResultados(null);
     setSeleccion(0);
@@ -58,7 +64,7 @@ export default function RelevamientoTool() {
 
     setCargando(true);
     try {
-      const res = await despivotarArchivo(file);
+      const res = await despivotarArchivo(file, hotelSel);
       setResultados(res);
     } catch (e) {
       if (e instanceof ArchivoInvalidoError) setError(e.message);
@@ -73,7 +79,7 @@ export default function RelevamientoTool() {
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) procesarArchivo(file);
+    if (file) procesarArchivo(file, hotel);
     e.target.value = "";
   };
 
@@ -81,7 +87,13 @@ export default function RelevamientoTool() {
     e.preventDefault();
     setArrastrando(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) procesarArchivo(file);
+    if (file) procesarArchivo(file, hotel);
+  };
+
+  // Al cambiar el hotel, reprocesa el mismo archivo con la grilla de la nueva sede.
+  const cambiarHotel = (h: Hotel) => {
+    setHotel(h);
+    if (ultimoArchivo.current) procesarArchivo(ultimoArchivo.current, h);
   };
 
   const reiniciar = () => {
@@ -89,6 +101,7 @@ export default function RelevamientoTool() {
     setSeleccion(0);
     setError("");
     setFileName("");
+    ultimoArchivo.current = null;
   };
 
   const descargarExcel = () => {
@@ -106,6 +119,20 @@ export default function RelevamientoTool() {
         se convierte en una lista plana —una fila por habitación— y la ves y descargás por
         separado, con solo las columnas que esa pestaña realmente tiene.
       </p>
+
+      <div className="hotel-selector">
+        <label htmlFor="conv-hotel">Hotel del relevamiento</label>
+        <select id="conv-hotel" value={hotel} onChange={(e) => cambiarHotel(e.target.value as Hotel)}>
+          {HOTELES.map((h) => (
+            <option key={h} value={h}>
+              {h}
+            </option>
+          ))}
+        </select>
+        <span className="hotel-selector__hint">
+          Cada hotel tiene distintas habitaciones. Elegí la sede antes de subir el Excel.
+        </span>
+      </div>
 
       {!resultados && (
         <section aria-labelledby="subir-rel-titulo" className="card card--subir">
@@ -279,7 +306,7 @@ export default function RelevamientoTool() {
         </section>
       )}
 
-      {!cargando && <AirtablePanel resultados={resultados} />}
+      <AirtablePanel resultados={resultados} hotel={hotel} />
     </>
   );
 }
