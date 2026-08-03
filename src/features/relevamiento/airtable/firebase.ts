@@ -96,7 +96,14 @@ export async function obtenerCredenciales(): Promise<CredencialesAirtable> {
   let snap;
   try {
     snap = await getDoc(DOC_CONFIG);
-  } catch {
+  } catch (e) {
+    // Las reglas exigen que el email esté en la lista de autorizados (colección
+    // `empleados`): tener cuenta no alcanza.
+    if ((e as { code?: string })?.code === "permission-denied") {
+      throw new AuthError(
+        "Tu usuario todavía no está habilitado para usar esta función. Pedile acceso al responsable."
+      );
+    }
     throw new AuthError(
       "No se pudieron leer las credenciales de Airtable. Revisá tu conexión o avisá al responsable."
     );

@@ -13,14 +13,21 @@ usuario y contraseña, y la app usa la credencial compartida guardada en Firesto
 | Qué | Dónde vive | Quién lo ve |
 | --- | --- | --- |
 | Usuarios y contraseñas | Firebase Authentication | Nadie (los administra Firebase) |
-| Token de Airtable | Firestore, documento `config/airtable` | Solo usuarios con sesión iniciada |
+| Token de Airtable | Firestore, documento `config/airtable` | Solo empleados **autorizados** |
+| Lista de autorizados | Firestore, colección `empleados` | Cada uno ve solo su entrada |
 | Config de Firebase (apiKey, etc.) | En el código | Es pública por diseño, no es un secreto |
 
 La clave del diseño: **el token de Airtable nunca está en el código ni en el repositorio**.
-Vive en Firestore y las reglas de seguridad (`firestore.rules`) solo permiten **leerlo** a un
-usuario autenticado, y **no permiten escribirlo desde la app** (se carga a mano desde la
-consola). Si un empleado deja de trabajar, se le borra el usuario y pierde el acceso al
+Vive en Firestore y las reglas de seguridad (`firestore.rules`) solo permiten **leerlo**, y
+solo a un empleado autorizado; **escribirlo desde la app está bloqueado** (se carga a mano
+desde la consola). Si alguien deja de trabajar, se le borra el usuario y pierde el acceso al
 instante, sin tener que cambiar el token.
+
+> **Por qué hay una lista de autorizados y no alcanza con tener cuenta.** Firebase permite el
+> **auto-registro**: como la `apiKey` es pública, cualquiera podría crearse una cuenta desde
+> afuera. Por eso las reglas exigen, además de la sesión, que el email tenga su documento en
+> la colección `empleados` (que solo creás vos). Sin esa entrada, la persona puede iniciar
+> sesión pero **no puede leer nada**.
 
 ---
 
@@ -64,11 +71,29 @@ npx firebase-tools deploy --only firestore:rules
 Esto aplica `firestore.rules`: lectura de `config/*` solo con sesión iniciada, escritura
 bloqueada, y todo lo demás cerrado.
 
-## Paso 5 — Dar de alta a los empleados
+## Paso 5 — Cerrar el auto-registro (recomendado)
 
-1. **Authentication → Users → Add user**.
-2. Poné el email y una contraseña provisoria; pasásela a la persona.
-3. Para quitarle el acceso a alguien: **Delete user** (o *Disable*). El cambio es inmediato.
+En **Authentication → Settings → User actions**, destildá **“Enable create (sign-up)”** y
+guardá. Así nadie puede crearse una cuenta por su cuenta; los usuarios los creás vos.
+(Aunque no lo hagas, la lista de autorizados del Paso 6 ya bloquea el acceso a los datos:
+esto es una segunda barrera.)
+
+## Paso 6 — Dar de alta a los empleados
+
+Por cada persona hay que hacer **dos cosas**:
+
+1. **Crear el usuario**: Authentication → **Users → Add user**. Poné su email y una
+   contraseña provisoria, y pasásela.
+2. **Autorizarla**: Firestore → colección **`empleados`** → **Add document** con
+   **ID de documento = el email exacto de la persona** (ej. `juan@htl.com`).
+   El documento puede ir vacío, o con un campo `nombre` (string) para acordarte de quién es.
+
+> Si te olvidás del segundo paso, la persona va a poder iniciar sesión pero le va a aparecer
+> *“Tu usuario todavía no está habilitado para usar esta función”*.
+
+**Para quitarle el acceso a alguien**: borrá su documento de `empleados` (corta el acceso a
+los datos al instante) y, si además no debe poder entrar, borrá o deshabilitá su usuario en
+Authentication.
 
 ---
 
@@ -83,7 +108,8 @@ bloqueada, y todo lo demás cerrado.
 
 | Síntoma | Causa probable |
 | --- | --- |
-| “El inicio de sesión con email no está habilitado” | Falta el Paso 1. |
+| “El inicio de sesión todavía no está configurado…” | Falta el Paso 1. |
+| “Tu usuario todavía no está habilitado…” | Falta su documento en `empleados` (Paso 6.2), o el ID no coincide **exactamente** con su email. |
 | “Todavía no están cargadas las credenciales…” | Falta el Paso 3 (o el ID del documento no es `airtable`). |
 | “No se pudieron leer las credenciales…” | Faltan las reglas (Paso 4) o Firestore no está creado (Paso 2). |
-| “El token no tiene permiso sobre esta base” | Al token de Airtable le falta acceso a la base o el scope de escritura. |
+| “El token no tiene permiso sobre esta base” | Al token de Airtable le falta acceso a la base o el scope `data.records:write`. |

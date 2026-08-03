@@ -2,15 +2,30 @@ rules_version = '2';
 
 // Reglas de seguridad de Firestore.
 //
-// La credencial de Airtable vive en config/airtable y SOLO la puede LEER un
-// usuario con sesión iniciada (empleado dado de alta en Authentication).
-// Nadie puede escribirla desde la app: se carga a mano desde la consola de
-// Firebase, así una cuenta comprometida no puede cambiar la credencial.
+// IMPORTANTE: tener sesión iniciada NO alcanza para leer la credencial de Airtable.
+// Firebase permite el auto-registro (cualquiera con la apiKey pública puede crearse
+// una cuenta), así que además exigimos que el email esté en la lista de autorizados:
+// un documento en la colección `empleados` cuyo ID es el email de la persona.
+// Ese documento solo se crea a mano desde la consola, nunca desde la app.
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function estaAutorizado() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/empleados/$(request.auth.token.email));
+    }
+
+    // Credenciales de Airtable: solo lectura, y solo para empleados autorizados.
     match /config/{documento} {
-      allow read: if request.auth != null;
+      allow read: if estaAutorizado();
+      allow write: if false;
+    }
+
+    // Lista de autorizados: cada quien puede ver únicamente su propia entrada
+    // (así la app puede avisar "tu usuario no está habilitado"). Nadie escribe.
+    match /empleados/{email} {
+      allow read: if request.auth != null && request.auth.token.email == email;
       allow write: if false;
     }
 
