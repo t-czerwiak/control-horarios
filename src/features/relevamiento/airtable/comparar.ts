@@ -147,6 +147,47 @@ export async function compararConAirtable(
   return { diffs, comparados, sinEnAirtable };
 }
 
+/** Resumen de lo que se va a subir, para mostrar antes de confirmar. */
+export interface ResumenCambios {
+  /** Registros de Airtable que se van a modificar. */
+  registros: number;
+  /** Cantidad de calificaciones (estrellas) a escribir. */
+  calificaciones: number;
+  /** Cantidad de observaciones (texto) a escribir. */
+  observaciones: number;
+  /** Habitaciones distintas afectadas. */
+  habitaciones: number;
+  /** Detalle por ítem, ordenado de mayor a menor. */
+  porItem: { item: string; cambios: number }[];
+}
+
+/** Calcula el resumen de los cambios seleccionados (para la confirmación). */
+export function resumirCambios(diffs: Diff[]): ResumenCambios {
+  const habitaciones = new Set<string>();
+  const registros = new Set<string>();
+  const porItem = new Map<string, number>();
+  let calificaciones = 0;
+  let observaciones = 0;
+
+  for (const d of diffs) {
+    habitaciones.add(d.habitacion);
+    registros.add(d.recordId);
+    porItem.set(d.item, (porItem.get(d.item) ?? 0) + 1);
+    if (d.campo === "Calificación") calificaciones++;
+    else observaciones++;
+  }
+
+  return {
+    registros: registros.size,
+    calificaciones,
+    observaciones,
+    habitaciones: habitaciones.size,
+    porItem: [...porItem.entries()]
+      .map(([item, cambios]) => ({ item, cambios }))
+      .sort((a, b) => b.cambios - a.cambios || a.item.localeCompare(b.item, "es")),
+  };
+}
+
 /** Agrupa los diffs seleccionados por registro, para el PATCH a Airtable. */
 export function armarUpdates(diffs: Diff[]): { id: string; fields: Record<string, unknown> }[] {
   const porRecord = new Map<string, Record<string, unknown>>();

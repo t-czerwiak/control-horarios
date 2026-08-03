@@ -107,10 +107,15 @@ Los CSV son **UTF-8** (con BOM, para que Excel muestre bien las tildes/ñ).
 La herramienta puede **comparar** el relevamiento con la base Airtable del cliente (Ticketera)
 y **actualizarla**, todo desde el navegador. Botón flotante **"Conectar con Airtable"**.
 
-- **Seguridad**: el token (Personal Access Token) y el Base ID quedan **solo en el navegador**
-  (en memoria, u opcionalmente en `localStorage` si se marca "recordar"); nunca en el código
-  ni en el repo. La sección está detrás de una passphrase (candado suave, en el cliente). La
-  API de Airtable acepta llamadas desde el navegador (CORS), así que **no hace falta backend**.
+- **Autenticación y credenciales**: cada empleado entra con **usuario y contraseña**
+  (Firebase Authentication, email/password). El **token de Airtable no lo maneja el usuario**:
+  vive en Firestore (`config/airtable`) y las reglas de seguridad (`firestore.rules`) solo
+  permiten **leerlo con sesión iniciada**; escribirlo desde la app está bloqueado (se carga a
+  mano desde la consola). Así el token **nunca está en el código ni en el repo**, se puede
+  rotar sin desplegar, y dar de baja a alguien es borrar su usuario.
+  La config de Firebase que sí está en el código (`apiKey`, etc.) es **pública por diseño**.
+  Puesta a punto inicial: [`docs/CONFIGURACION-ADMIN.md`](docs/CONFIGURACION-ADMIN.md).
+- La API de Airtable acepta llamadas desde el navegador (CORS), así que **no hace falta backend**.
 - **Cruce**: por sede (del campo `Espacio`), y por `Ítem × Habitación`. El mapeo pestaña→ítem
   por hotel está en `src/features/relevamiento/airtable/mapeoAirtable.ts` (generado desde la
   planilla del cliente; regenerar con el script si cambia). Se resuelven los campos linkeados
@@ -120,14 +125,28 @@ y **actualizarla**, todo desde el navegador. Botón flotante **"Conectar con Air
     `Bien = 5`, `Más o menos = 3`, `Mal = 1`. `No revisado` **no** toca la calificación.
   - **Observación**: del `Detalle` del relevamiento (no se pisa con vacío).
 - **Flujo**: *Comparar* (solo lectura) → **vista previa** de cada cambio (`En Airtable → Quedaría`),
-  con checkbox por fila → *Aplicar* (PATCH en lotes de 10, con confirmación). Actualizar requiere
-  que el token tenga el scope `data.records:write`.
+  con checkbox por fila → *Revisar y aplicar*: pantalla de **confirmación con el resumen**
+  (registros, habitaciones, calificaciones, observaciones y detalle por ítem) que exige tildar
+  una casilla → *Aplicar* (PATCH en lotes de 10). Escribir requiere que el token tenga el scope
+  `data.records:write`. Durante comparar/aplicar hay un **overlay a pantalla completa** que
+  bloquea la interacción para que no se corte el proceso.
 
-Módulos: `airtable/airtableClient.ts` (API), `airtable/comparar.ts` (cruce y diff),
-`airtable/AirtablePanel.tsx` (UI).
+Módulos (uno por responsabilidad):
 
-Guía de uso paso a paso para el personal: [`docs/GUIA-EMPLEADOS.md`](docs/GUIA-EMPLEADOS.md)
-(genérica, sin marca; también disponible en PDF).
+| Archivo | Qué hace |
+| --- | --- |
+| `airtable/firebase.ts` | Login, sesión y lectura de credenciales desde Firestore |
+| `airtable/airtableClient.ts` | Llamadas a la API de Airtable (paginado, throttle, PATCH por lotes) |
+| `airtable/comparar.ts` | Cruce con el relevamiento, diff y resumen de cambios |
+| `airtable/AirtablePanel.tsx` | Orquesta la ventanita y los pasos |
+| `airtable/LoginForm.tsx` | Formulario de inicio de sesión |
+| `airtable/DiffTable.tsx` | Tabla de vista previa |
+| `airtable/ConfirmarAplicar.tsx` | Resumen y confirmación antes de escribir |
+| `airtable/mapeoAirtable.ts` | Mapeo pestaña→ítem por hotel (generado desde la planilla) |
+
+Documentación:
+- Puesta a punto (admin): [`docs/CONFIGURACION-ADMIN.md`](docs/CONFIGURACION-ADMIN.md)
+- Uso paso a paso (personal): [`docs/GUIA-EMPLEADOS-HTL.md`](docs/GUIA-EMPLEADOS-HTL.md) (también en PDF)
 
 ---
 

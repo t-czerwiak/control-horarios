@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Reglas de seguridad de Firestore.
+//
+// La credencial de Airtable vive en config/airtable y SOLO la puede LEER un
+// usuario con sesión iniciada (empleado dado de alta en Authentication).
+// Nadie puede escribirla desde la app: se carga a mano desde la consola de
+// Firebase, así una cuenta comprometida no puede cambiar la credencial.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /config/{documento} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Todo lo demás queda cerrado por defecto.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
