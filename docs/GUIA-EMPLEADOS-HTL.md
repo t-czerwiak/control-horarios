@@ -51,9 +51,10 @@ ya está cargada en el sistema y se usa sola cuando iniciás sesión.
 ## Paso a paso
 
 1. Entrá a la página y andá a la pestaña **"Convertidor de Reportes de Habitaciones → Airtable"**.
-2. Arriba, en **"Hotel del relevamiento"**, elegí la **sede** que corresponde al Excel.
-   *Importante: elegí la sede correcta antes de subir el archivo.*
-3. **Subí el Excel** (clic o arrastrándolo).
+2. **Subí el Excel** (clic o arrastrándolo). La herramienta **detecta sola la sede**, por el
+   nombre del archivo o, si no lo dice, por las habitaciones que contiene.
+3. Fijate en el cartel **"Sede"** que aparece arriba de la tabla: dice cuál detectó. Si por
+   algún motivo no es la correcta, cambiala ahí y se recalcula todo.
 4. Abajo a la derecha, tocá el botón **"Conectar con Airtable"**.
 5. Ingresá tu **email y contraseña**, y tocá **Entrar**.
 6. Tocá **"Comparar con el relevamiento"**. Tarda alrededor de **un minuto** mientras trae los

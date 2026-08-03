@@ -91,8 +91,14 @@ error en la planilla— así que se excluye; el piso 10 queda con `1001`, `1003`
      `Más o menos = 3`, `Mal = 1`, `No revisado` queda en blanco.
    - Las fechas se formatean `dd/mm/aaaa`. Los demás datos van **en crudo**, sin clasificar.
    - Se incluyen todas las habitaciones del bloque (para ver qué falta revisar).
-3. Antes de subir el Excel se **elige el hotel** (Urbano / 9 de Julio / City). Cada sede tiene
-   su propia grilla de habitaciones (Urbano 82, 9 de Julio 57, City 70), tomada de la tabla
+3. La **sede se detecta sola** (`despivotarArchivo` devuelve `{ resultados, hotel, deteccion }`):
+   primero por el **nombre del archivo** (`hotelPorNombre`: "urbano", "city", "9j"…) y, si no
+   alcanza, por el **contenido** (`hotelPorContenido`), comparando las habitaciones del archivo
+   contra la grilla de cada sede con **índice de Jaccard**. Se usa Jaccard y no "cuántas
+   encajan" porque casi todas las habitaciones de 9 de Julio existen también en Urbano: lo que
+   distingue a cada sede es qué habitaciones **no** tiene. El usuario puede corregir la sede a
+   mano y se reprocesa.
+   Cada sede tiene su propia grilla (Urbano 82, 9 de Julio 57, City 70), tomada de la tabla
    `Espacios` de Airtable; el archivo se normaliza a la grilla de esa sede.
 4. **Se ve y se descarga una pestaña a la vez**: elegís la pestaña en un selector, ves su
    vista previa y descargás su CSV individual. **Descargar todas** genera un único Excel

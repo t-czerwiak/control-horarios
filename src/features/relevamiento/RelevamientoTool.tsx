@@ -11,6 +11,7 @@ import {
 import AirtablePanel from "./airtable/AirtablePanel";
 import { HOTELES } from "./airtable/mapeoAirtable";
 import type { Hotel } from "./airtable/mapeoAirtable";
+import type { OrigenDeteccion } from "./unpivot";
 
 const EXTENSIONES_VALIDAS = [".xlsx", ".xls"];
 const MAX_PREVIEW = 60;
@@ -45,11 +46,15 @@ export default function RelevamientoTool() {
   const [arrastrando, setArrastrando] = useState(false);
   const [verTodas, setVerTodas] = useState(false);
   const [hotel, setHotel] = useState<Hotel>("HTL Urbano");
+  const [deteccion, setDeteccion] = useState<OrigenDeteccion>("manual");
   const inputRef = useRef<HTMLInputElement>(null);
   const ultimoArchivo = useRef<File | null>(null);
 
-  // Se pasa el hotel para normalizar a la grilla de habitaciones de esa sede.
-  const procesarArchivo = useCallback(async (file: File, hotelSel: Hotel) => {
+  /**
+   * Procesa el archivo. Si no se fuerza una sede, la deduce sola (por el nombre
+   * del archivo o, si no alcanza, por las habitaciones que contiene).
+   */
+  const procesarArchivo = useCallback(async (file: File, hotelForzado?: Hotel) => {
     ultimoArchivo.current = file;
     setError("");
     setResultados(null);
@@ -64,8 +69,10 @@ export default function RelevamientoTool() {
 
     setCargando(true);
     try {
-      const res = await despivotarArchivo(file, hotelSel);
-      setResultados(res);
+      const res = await despivotarArchivo(file, hotelForzado);
+      setResultados(res.resultados);
+      setHotel(res.hotel as Hotel);
+      setDeteccion(res.deteccion);
     } catch (e) {
       if (e instanceof ArchivoInvalidoError) setError(e.message);
       else {
@@ -79,7 +86,7 @@ export default function RelevamientoTool() {
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) procesarArchivo(file, hotel);
+    if (file) procesarArchivo(file);
     e.target.value = "";
   };
 
@@ -87,12 +94,13 @@ export default function RelevamientoTool() {
     e.preventDefault();
     setArrastrando(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) procesarArchivo(file, hotel);
+    if (file) procesarArchivo(file);
   };
 
-  // Al cambiar el hotel, reprocesa el mismo archivo con la grilla de la nueva sede.
+  // Corregir la sede a mano: reprocesa el mismo archivo con la grilla elegida.
   const cambiarHotel = (h: Hotel) => {
     setHotel(h);
+    setDeteccion("manual");
     if (ultimoArchivo.current) procesarArchivo(ultimoArchivo.current, h);
   };
 
@@ -101,6 +109,7 @@ export default function RelevamientoTool() {
     setSeleccion(0);
     setError("");
     setFileName("");
+    setDeteccion("manual");
     ultimoArchivo.current = null;
   };
 
@@ -120,19 +129,25 @@ export default function RelevamientoTool() {
         separado, con solo las columnas que esa pestaña realmente tiene.
       </p>
 
-      <div className="hotel-selector">
-        <label htmlFor="conv-hotel">Hotel del relevamiento</label>
-        <select id="conv-hotel" value={hotel} onChange={(e) => cambiarHotel(e.target.value as Hotel)}>
-          {HOTELES.map((h) => (
-            <option key={h} value={h}>
-              {h}
-            </option>
-          ))}
-        </select>
-        <span className="hotel-selector__hint">
-          Cada hotel tiene distintas habitaciones. Elegí la sede antes de subir el Excel.
-        </span>
-      </div>
+      {resultados && (
+        <div className="hotel-selector">
+          <label htmlFor="conv-hotel">Sede</label>
+          <select id="conv-hotel" value={hotel} onChange={(e) => cambiarHotel(e.target.value as Hotel)}>
+            {HOTELES.map((h) => (
+              <option key={h} value={h}>
+                {h}
+              </option>
+            ))}
+          </select>
+          <span className="hotel-selector__hint">
+            {deteccion === "manual"
+              ? "Sede elegida a mano."
+              : `Detectada automáticamente ${
+                  deteccion === "nombre" ? "por el nombre del archivo" : "por las habitaciones del archivo"
+                }. Si no es la correcta, cambiala acá.`}
+          </span>
+        </div>
+      )}
 
       {!resultados && (
         <section aria-labelledby="subir-rel-titulo" className="card card--subir">

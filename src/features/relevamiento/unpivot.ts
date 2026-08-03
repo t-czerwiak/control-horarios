@@ -23,6 +23,15 @@ export interface RelevRow {
   campos: Record<string, string>;
 }
 
+/** Resultado de procesar un archivo completo: las listas y de qué sede es. */
+export interface ResultadoArchivo {
+  resultados: SheetResult[];
+  /** Sede usada para normalizar las habitaciones. */
+  hotel: string;
+  /** Cómo se determinó esa sede. */
+  deteccion: OrigenDeteccion;
+}
+
 /** Resultado de despivotar una pestaña. */
 export interface SheetResult {
   /** Nombre de la pestaña de origen. */
@@ -82,6 +91,63 @@ export const GRILLAS: Record<string, Grilla> = {
 };
 
 const GRILLA_DEFAULT = GRILLAS["HTL Urbano"];
+
+/** Cómo se determinó el hotel de un archivo. */
+export type OrigenDeteccion = "nombre" | "contenido" | "manual";
+
+/** Quita acentos y pasa a minúsculas, para comparar nombres sin sorpresas. */
+function normalizar(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+/**
+ * Intenta deducir la sede del NOMBRE del archivo (ej. "Relevamiento 9j - 2025.xlsx").
+ * Devuelve null si el nombre no menciona ninguna sede conocida.
+ */
+export function hotelPorNombre(fileName: string): string | null {
+  const n = normalizar(fileName);
+  if (/\burbano\b/.test(n)) return "HTL Urbano";
+  if (/\bcity\b/.test(n)) return "HTL City Baires";
+  if (/\b9\s*j\b|9\s*de\s*julio|nueve\s*de\s*julio|\b9j\b/.test(n)) return "HTL 9 de Julio";
+  return null;
+}
+
+/**
+ * Deduce la sede por el CONTENIDO: cada hotel tiene su propia numeración de
+ * habitaciones (Urbano arranca en 101, 9 de Julio tiene X10, City llega al piso 13),
+ * así que se elige la grilla donde encajan mejor los números del archivo.
+ * Sirve aunque el archivo esté renombrado. Devuelve null si ninguna encaja claro.
+ */
+function hotelPorContenido(rooms: Set<number>): string | null {
+  if (rooms.size === 0) return null;
+  let mejor: string | null = null;
+  let mejorPuntaje = 0;
+  let segundo = 0;
+  for (const [hotel, grid] of Object.entries(GRILLAS)) {
+    const canonicas = habitacionesCanonicas(grid);
+    let comunes = 0;
+    for (const n of canonicas) if (rooms.has(n)) comunes++;
+    // Parecido entre conjuntos (Jaccard): cuenta tanto las habitaciones que
+    // coinciden como las que sobran o faltan. Comparar solo "cuántas encajan" no
+    // alcanza: las de 9 de Julio casi todas existen también en Urbano, y lo que
+    // realmente distingue a cada sede es qué habitaciones NO tiene.
+    const union = canonicas.length + rooms.size - comunes;
+    const puntaje = union > 0 ? comunes / union : 0;
+    if (puntaje > mejorPuntaje) {
+      segundo = mejorPuntaje;
+      mejorPuntaje = puntaje;
+      mejor = hotel;
+    } else if (puntaje > segundo) {
+      segundo = puntaje;
+    }
+  }
+  // Exigimos que se parezca bastante y que le gane con claridad a la segunda opción.
+  if (mejorPuntaje < 0.5 || mejorPuntaje - segundo < 0.1) return null;
+  return mejor;
+}
 
 /** Número de habitación a partir de piso + índice (piso·100 + índice). */
 function numeroHab(piso: number, idx: number): number {
@@ -490,7 +556,10 @@ export function despivotarHoja(pestana: string, ws: XLSX.WorkSheet, grid: Grilla
  * pestaña. Lanza ArchivoInvalidoError si el archivo es ilegible o no tiene
  * ninguna habitación reconocible en ninguna pestaña.
  */
-export async function despivotarArchivo(file: File, hotel = "HTL Urbano"): Promise<SheetResult[]> {
+export async function despivotarArchivo(
+  file: File,
+  hotelForzado?: string
+): Promise<ResultadoArchivo> {
   const buffer = await file.arrayBuffer();
   let workbook: XLSX.WorkBook;
   try {
@@ -500,6 +569,35 @@ export async function despivotarArchivo(file: File, hotel = "HTL Urbano"): Promi
     throw new ArchivoInvalidoError(
       "No se pudo leer el archivo. Asegurate de que sea un Excel (.xlsx / .xls) válido."
     );
+  }
+
+  // Qué sede es: lo que eligió el usuario, o el nombre del archivo, o su contenido.
+  let hotel = hotelForzado ?? null;
+  let deteccion: OrigenDeteccion = "manual";
+  if (!hotel) {
+    hotel = hotelPorNombre(file.name);
+    deteccion = "nombre";
+  }
+  if (!hotel) {
+    const rooms = new Set<number>();
+    for (const nombre of workbook.SheetNames) {
+      const ws = workbook.Sheets[nombre];
+      const ref = ws["!ref"];
+      if (!ref) continue;
+      const range = XLSX.utils.decode_range(ref);
+      for (let r = range.s.r; r <= range.e.r; r++) {
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const cell = ws[XLSX.utils.encode_cell({ r, c })];
+          if (cell && esHabitacion(cell.v)) rooms.add(numDeCelda(cell.v));
+        }
+      }
+    }
+    hotel = hotelPorContenido(rooms);
+    deteccion = "contenido";
+  }
+  if (!hotel) {
+    hotel = "HTL Urbano";
+    deteccion = "manual";
   }
 
   const grid = GRILLAS[hotel] ?? GRILLA_DEFAULT;
@@ -514,5 +612,5 @@ export async function despivotarArchivo(file: File, hotel = "HTL Urbano"): Promi
       "No se reconoció ninguna habitación en el archivo. Esperaba una grilla de habitaciones (101, 102, …) por pestaña."
     );
   }
-  return resultados;
+  return { resultados, hotel, deteccion };
 }
